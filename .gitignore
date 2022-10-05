@@ -1,0 +1,4 @@
+env/
+code/__pycache__/
+code/custom/__pycache__/
+code/utils/__pycache__/
