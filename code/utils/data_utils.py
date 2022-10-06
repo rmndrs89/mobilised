@@ -4,9 +4,9 @@ import os, random
 import tensorflow as tf
 
 SAMPLING_FREQUENCY = 100.0  # Hz
-# DATASET_DIR = "/gxfs_work1/cau/sukne964/Datasets/Mobilised-D/rawdata/MicroWB"
+DATASET_DIR = "/gxfs_work1/cau/sukne964/Datasets/Mobilised-D/rawdata/MicroWB"
 # DATASET_DIR = "/home/robbin/Datasets/Mobilise-D/rawdata/MicroWB"
-DATASET_DIR = "D:\\Datasets\\Mobilise-D\\rawdata\\MicroWB"
+# DATASET_DIR = "D:\\Datasets\\Mobilise-D\\rawdata\\MicroWB"
 MAP_INDEX_EVENTS = {idx: event_name for idx, event_name in enumerate(["null", "ICL", "FCL", "ICR", "FCR"])}
 MAP_INDEX_PHASES = {idx: gait_phase for idx, gait_phase in enumerate(["null", "LeftSwing", "RightSwing"])}
 

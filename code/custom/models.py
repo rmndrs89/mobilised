@@ -23,6 +23,7 @@ def get_model(
     # Define the layers
     input_layer = Input(shape=(None, num_input_channels), name="input_layer")
     tcn_layer = TCN(
+        padding="same",
         use_batch_norm=True,
         use_skip_connections=True,
         return_sequences=True,

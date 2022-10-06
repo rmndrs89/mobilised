@@ -19,7 +19,7 @@ BASE_CHECKPOINT_PATH = "./runs/test"
 MODE = "gait_events"
 ML_TASK = "classification"
 LABELS_AS = "binary"
-TOLERANCE = 0 #int(0.050 * SAMPLING_FREQUENCY)
+TOLERANCE = int(0.050 * SAMPLING_FREQUENCY)
 WIN_LEN = int(6 * SAMPLING_FREQUENCY)
 
 def main(mode: str = "gait_events",
@@ -70,7 +70,7 @@ def main(mode: str = "gait_events",
     model.summary()
 
     # Define callbacks
-    checkpoint_path = os.path.join(BASE_CHECKPOINT_PATH, f"00")
+    checkpoint_path = os.path.join(BASE_CHECKPOINT_PATH, f"03")
     if not os.path.isdir(checkpoint_path):
         os.mkdir(checkpoint_path)
     csv_logger = tf.keras.callbacks.CSVLogger(
