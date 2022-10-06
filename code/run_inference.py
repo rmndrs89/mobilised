@@ -1,4 +1,5 @@
 from gettext import find
+from pydoc import visiblename
 import numpy as np
 import os, sys, random
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
@@ -26,8 +27,6 @@ LABELS_AS = "binary"
 TOLERANCE = int(0.050 * SAMPLING_FREQUENCY)
 WIN_LEN = int(6 * SAMPLING_FREQUENCY)
 
-DATASET_DIR = "D:\\Datasets\\Mobilise-D\\rawdata\\MicroWB"
-
 
 def main():
     # Get mapping from index to labels
@@ -40,23 +39,19 @@ def main():
     _, _, test_files = split_train_test(DATASET_DIR, test_size=0.2, seed=123)
 
     # Get models
-    trained_model_0 = tf.keras.models.load_model(
-        os.path.join(BASE_CHECKPOINT_PATH, "00"), 
-        custom_objects={"MyWeightedCategoricalCrossentropy": MyWeightedCategoricalCrossentropy})
-    
-    trained_model_1 = tf.keras.models.load_model(
-        os.path.join(BASE_CHECKPOINT_PATH, "01"), 
-        custom_objects={"MyWeightedCategoricalCrossentropy": MyWeightedCategoricalCrossentropy})
-
-    trained_model_0.summary()
-    trained_model_1.summary()
+    trained_models = [
+        tf.keras.models.load_model(
+            os.path.join(BASE_CHECKPOINT_PATH, folder_name),
+            custom_objects={"MyWeightedCategoricalCrossentropy": MyWeightedCategoricalCrossentropy}
+        ) for folder_name in os.listdir(BASE_CHECKPOINT_PATH) if os.path.isdir(os.path.join(BASE_CHECKPOINT_PATH, folder_name))
+    ]
 
     # Get a random file
     random.seed(43)
     random_test_file = random.sample(test_files, k=1)[0]
 
     # Load data and labels
-    data, labels_0 = _load_data(
+    data, labels = _load_data(
         file_path=random_test_file,
         tracked_points=["LeftFoot", "RightFoot"],
         incl_magn=False,
@@ -66,90 +61,40 @@ def main():
         tolerance=0
     )
 
-    _, labels_1 = _load_data(
-        file_path=random_test_file,
-        tracked_points=["LeftFoot", "RightFoot"],
-        incl_magn=False,
-        mode=MODE,
-        task=ML_TASK,
-        labels_as=LABELS_AS,
-        tolerance=TOLERANCE
-    )
-
     # Dictionary of annotated indices
-    labels_idx = {evnt: np.argwhere(labels_0[:, idx_evnt]==1)[:,0] for idx_evnt, evnt in map_index_labels.items() if evnt != "null"}
+    labels_idx = {evnt: np.argwhere(labels[:, idx_evnt]==1)[:,0] for idx_evnt, evnt in map_index_labels.items() if evnt != "null"}
 
+    # Make predictions
+    predictions = [
+        model.predict(data[None, ...]) for model in trained_models
+    ]
 
-    # Make predictoins
-    predictions_0 = trained_model_0.predict(data[None, ...])
-    predictions_1 = trained_model_1.predict(data[None, ...])
-
-    # Find peak probabilities
-    thr_proba = 0.5
-    thr_distance = int(SAMPLING_FREQUENCY//2)
-    peak_probs_0 = {evnt: [] for evnt in map_index_labels.values() if evnt != "null"}
-    peak_probs_1 = {evnt: [] for evnt in map_index_labels.values() if evnt != "null"}
-    for idx_evnt, evnt in map_index_labels.items():
-        if evnt != "null":
-            idx_pks, _ = find_peaks(predictions_0[0][:, idx_evnt], height=thr_proba, distance=thr_distance)
-            peak_probs_0[evnt] = idx_pks
-            idx_pks, _ = find_peaks(predictions_1[0][:, idx_evnt], height=thr_proba, distance=thr_distance)
-            peak_probs_1[evnt] = idx_pks
-    
-    # Match peak probabilities with annotated events
-    matched_events_0 = {evnt: dict() for evnt in peak_probs_0.keys()}
-    for idx_evnt, evnt in map_index_labels.items():
-        if evnt != "null":
-            map_annotations_preds, map_preds_annotations = match_events(
-                np.argwhere(labels_0[:, idx_evnt]==1)[:,0],
-                peak_probs_0[evnt],
-                tolerance=int(SAMPLING_FREQUENCY//4),
-                do_print=False
-            )
-            matched_events_0[evnt]["a2p"] = map_annotations_preds
-            matched_events_0[evnt]["p2a"] = map_preds_annotations
-
-    # Plot file
-    fig, axs = plt.subplots(4, 1, sharex=True, gridspec_kw={"height_ratios": [3, 3, 1, 1]}, figsize=(29.7/2.54, 21/2.54), num=os.path.split(random_test_file)[-1][:-4])
-    axs[0].plot(np.arange(len(data)), data[:, 0:3])
-    axs[1].plot(np.arange(len(data)), data[:, 3:6])
-    for idx in np.argwhere(labels_0[:, 1]==1)[:, 0]:
-        axs[0].axvline(idx, c="tab:red", alpha=0.2)
-        axs[1].axvline(idx, c="tab:red", alpha=0.2)
-        axs[2].axvline(idx, c="tab:red")
-    for idx in np.argwhere(labels_0[:, 2]==1)[:, 0]:
-        axs[0].axvline(idx, c="tab:green", alpha=0.2)
-        axs[1].axvline(idx, c="tab:green", alpha=0.2)
-        axs[3].axvline(idx, c="tab:green")
-    axs[2].fill_between(np.arange(len(labels_1)), labels_1[:, 1], fc="tab:red", alpha=0.2)
-    axs[2].plot(np.arange(len(predictions_0[0])), predictions_0[0][:, 1], c="tab:purple")
-    # axs[2].plot(peak_probs_0["ICL"], predictions_0[0][peak_probs_0["ICL"], 1], ls="None", marker="o", mfc="None", mec="tab:purple", ms=8)
-    # axs[2].plot(peak_probs_0["ICL"][matched_events_0["ICL"]["p2a"] > -1], predictions_0[0][peak_probs_0["ICL"][matched_events_0["ICL"]["p2a"] > -1], 1], ls="None", marker="o", mfc=(0, 1, 0), mec="k", ms=8)
-    # axs[2].plot(peak_probs_0["ICL"][matched_events_0["ICL"]["p2a"] <= -1], predictions_0[0][peak_probs_0["ICL"][matched_events_0["ICL"]["p2a"] <= -1], 1], ls="None", marker="o", mfc=(1, 0, 0), mec="k", ms=8)
-    axs[2].plot(np.arange(len(predictions_1[0])), predictions_1[0][:, 1], c="tab:pink")
-    axs[3].fill_between(np.arange(len(labels_1)), labels_1[:, 2], fc="tab:red", alpha=0.2)
-    axs[3].plot(np.arange(len(predictions_0[0])), predictions_0[0][:, 2], c="tab:purple")
-    # axs[3].plot(peak_probs_0["FCL"], predictions_0[0][peak_probs_0["FCL"], 2], ls="None", marker="o", mfc="None", mec="tab:purple", ms=8)
-    # axs[3].plot(peak_probs_0["FCL"][matched_events_0["FCL"]["p2a"] > -1], predictions_0[0][peak_probs_0["FCL"][matched_events_0["FCL"]["p2a"] > -1], 2], ls="None", marker="o", mfc=(0, 1, 0), mec="k", ms=8)
-    # axs[3].plot(peak_probs_0["FCL"][matched_events_0["FCL"]["p2a"] <= -1], predictions_0[0][peak_probs_0["FCL"][matched_events_0["FCL"]["p2a"] <= -1], 2], ls="None", marker="o", mfc=(1, 0, 0), mec="k", ms=8)
-    axs[3].plot(np.arange(len(predictions_1[0])), predictions_1[0][:, 2], c="tab:pink")
-    for ax in axs:
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_position("zero")
-        ax.grid(visible=True, which="both", axis="both", alpha=0.5, ls=":")
-        for lbl in ax.get_xticklabels() + ax.get_yticklabels():
-            lbl.set_fontsize(16)
-    axs[2].set_ylim((-.1, 1.1))
-    axs[3].set_ylim((-.1, 1.1))
-    # axs[3].set_xlim((0, len(data)))
-    axs[3].set_xlim((1100, 1400))
-    axs[0].set_ylabel("acceleration, $a$ / g", fontsize=16)
-    axs[1].set_ylabel(r"ang. vel., $\omega$ / deg/s", fontsize=16)
-    axs[2].set_ylabel("Pr(ICL)", fontsize=16)
-    axs[3].set_ylabel("Pr(FCL)", fontsize=16)
-    axs[3].set_xlabel("time / samples", fontsize=16)
-    plt.tight_layout()
+    # Visualize
+    fig, axs = plt.subplots(4, 2, sharex=True, gridspec_kw={"height_ratios": [3, 3, 1, 1]})
+    axs[0, 0].plot(np.arange(len(data)), data[:, 0:3], lw=1)
+    axs[0, 1].plot(np.arange(len(data)), data[:, 6:9], lw=1)
+    axs[1, 0].plot(np.arange(len(data)), data[:, 3:6], lw=1)
+    axs[1, 1].plot(np.arange(len(data)), data[:, 9:], lw=1)
+    axs[2, 0].plot(np.arange(len(labels)), labels[:, 1], lw=1)
+    axs[3, 0].plot(np.arange(len(labels)), labels[:, 2], lw=1)
+    axs[2, 1].plot(np.arange(len(labels)), labels[:, 3], lw=1)
+    axs[3, 1].plot(np.arange(len(labels)), labels[:, 4], lw=1)
+    for preds in predictions:
+        axs[2, 0].plot(np.arange(len(preds[0])), preds[0][:, 1], lw=2)
+        axs[3, 0].plot(np.arange(len(preds[0])), preds[0][:, 2], lw=2)
+        axs[2, 1].plot(np.arange(len(preds[0])), preds[0][:, 3], lw=2)
+        axs[3, 1].plot(np.arange(len(preds[0])), preds[0][:, 4], lw=2)
+    for row in axs:
+        for col in row:
+            col.spines["top"].set_visible(False)
+            col.spines["right"].set_visible(False)
+            col.spines["bottom"].set_position("zero")
+            col.grid(visible=True, which="both", axis="both", alpha=0.2, ls=":")
+    axs[2, 0].set_ylim((-.2, 1.2))
+    axs[2, 1].set_ylim((-.2, 1.2))
+    axs[3, 0].set_ylim((-.2, 1.2))
+    axs[3, 1].set_ylim((-.2, 1.2))
+    axs[3, 1].set_xlim((0, len(data)))
     plt.show()
     return
 
