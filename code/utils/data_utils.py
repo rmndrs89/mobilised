@@ -4,9 +4,9 @@ import os, random
 import tensorflow as tf
 
 SAMPLING_FREQUENCY = 100.0  # Hz
-# DATASET_DIR = "/gxfs_work1/cau/sukne964/Datasets/Mobilised-D/rawdata/MicroWB"
+DATASET_DIR = "/gxfs_work1/cau/sukne964/Datasets/Mobilised-D/rawdata/MicroWB"
 # DATASET_DIR = "/home/robbin/Datasets/Mobilise-D/rawdata/MicroWB"
-DATASET_DIR = "D:\\Datasets\\Mobilise-D\\rawdata\\MicroWB"
+# DATASET_DIR = "D:\\Datasets\\Mobilise-D\\rawdata\\MicroWB"
 MAP_INDEX_EVENTS = {idx: event_name for idx, event_name in enumerate(["null", "ICL", "FCL", "ICR", "FCR"])}
 MAP_INDEX_PHASES = {idx: gait_phase for idx, gait_phase in enumerate(["null", "LeftSwing", "RightSwing"])}
 
@@ -140,6 +140,7 @@ def _get_labels(annotations, mode="gait_events", task="classification", labels_a
 def _load_data(file_path, 
         tracked_points=["LeftFoot", "RightFoot"],
         incl_magn: bool = False,
+        normalize: bool = True,
         mode: str = "gait_events",
         task: str = "classification",
         labels_as: str = "binary",
@@ -164,6 +165,10 @@ def _load_data(file_path,
     else:
         idx_cols = [idx for idx, tp in enumerate(channels_df["tracked_point"]) if (tp in tracked_points) and (channels_df["type"][idx] != "Mag")]
     data = data[:, idx_cols]
+
+    # Normalize data channel-wise
+    if normalize:
+        data = (data - data.mean(axis=0, keepdims=True))/(data.std(axis=0, keepdims=True) + np.finfo("float32").eps)
 
     # Get labels from annotations
     labels = _get_labels(annotations, mode=mode, task=task, labels_as=labels_as, tolerance=tolerance)

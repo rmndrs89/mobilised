@@ -70,7 +70,7 @@ def main(mode: str = "gait_events",
     model.summary()
 
     # Define callbacks
-    checkpoint_path = os.path.join(BASE_CHECKPOINT_PATH, f"03")
+    checkpoint_path = os.path.join(BASE_CHECKPOINT_PATH, f"04")
     if not os.path.isdir(checkpoint_path):
         os.mkdir(checkpoint_path)
     csv_logger = tf.keras.callbacks.CSVLogger(
