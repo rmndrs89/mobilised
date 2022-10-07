@@ -52,7 +52,7 @@ def main(visualize: bool = False):
     output_dfs = [pd.DataFrame() for _ in trained_models]
 
     # Loop over the test files
-    for idx_file, test_file_path in  enumerate(test_files):
+    for _, test_file_path in  enumerate(test_files):
         
         # Load data and labels
         data, labels = _load_data(
@@ -116,62 +116,27 @@ def main(visualize: bool = False):
             # Add to overal output dataframes
             output_dfs[p] = pd.concat((output_dfs[p], results_df), axis=0, ignore_index=True)
 
-        # Visualize
-        visualize = visualize
-        if visualize:
-            fig, axs = plt.subplots(4, 2, sharex=True, gridspec_kw={"height_ratios": [3, 3, 1, 1]})
-            axs[0, 0].plot(np.arange(len(data)), data[:, 0:3], lw=2, alpha=0.4)
-            axs[0, 0].plot(np.arange(len(data)), np.linalg.norm(data[:, 0:3], axis=1), lw=1, c=(0, 0, 0))
-            axs[0, 1].plot(np.arange(len(data)), data[:, 6:9], lw=2, alpha=0.4)
-            axs[0, 1].plot(np.arange(len(data)), np.linalg.norm(data[:, 6:9], axis=1), lw=1, c=(0, 0, 0))
-            axs[1, 0].plot(np.arange(len(data)), data[:, 3:6], lw=2, alpha=0.4)
-            axs[1, 1].plot(np.arange(len(data)), data[:, 9:], lw=2, alpha=0.4)
-            for evnt in list(labels_idx.keys()):
-                for idx_evnt in labels_idx[evnt]:
-                    if evnt == "ICL":
-                        axs[0,0].axvline(idx_evnt, c="r", ls='--', alpha=0.3)
-                        axs[1,0].axvline(idx_evnt, c="r", ls='--', alpha=0.3)
-                        axs[2,0].axvline(idx_evnt, c="r", ls='--')
-                    elif evnt == "FCL":
-                        axs[0,0].axvline(idx_evnt, c="r", ls=':', alpha=0.3)
-                        axs[1,0].axvline(idx_evnt, c="r", ls=':', alpha=0.3)
-                        axs[3,0].axvline(idx_evnt, c="r", ls=':')
-                    elif evnt == "ICR":
-                        axs[0,1].axvline(idx_evnt, c="r", ls='--', alpha=0.3)
-                        axs[1,1].axvline(idx_evnt, c="r", ls='--', alpha=0.3)
-                        axs[2,1].axvline(idx_evnt, c="r", ls='--')
-                    else:  # evnt == "FCR":
-                        axs[0,1].axvline(idx_evnt, c="r", ls=':', alpha=0.3)
-                        axs[1,1].axvline(idx_evnt, c="r", ls=':', alpha=0.3)
-                        axs[3,1].axvline(idx_evnt, c="r", ls=':')
-                    
-            for preds in predictions:
-                axs[2, 0].plot(np.arange(len(preds[0])), preds[0][:, 1], lw=2)
-                axs[3, 0].plot(np.arange(len(preds[0])), preds[0][:, 2], lw=2)
-                axs[2, 1].plot(np.arange(len(preds[0])), preds[0][:, 3], lw=2)
-                axs[3, 1].plot(np.arange(len(preds[0])), preds[0][:, 4], lw=2)
-            
-            for p in range(len(peak_probs_idx)):
-                axs[2,0].plot(peak_probs_idx[p]["ICL"], predictions[p][0][peak_probs_idx[p]["ICL"], 1], ls="None", marker="o")
-            for p in range(len(peak_probs_idx)):
-                axs[3,0].plot(peak_probs_idx[p]["FCL"], predictions[p][0][peak_probs_idx[p]["FCL"], 2], ls="None", marker="o")
-            for p in range(len(peak_probs_idx)):
-                axs[2,1].plot(peak_probs_idx[p]["ICR"], predictions[p][0][peak_probs_idx[p]["ICR"], 3], ls="None", marker="o")
-            for p in range(len(peak_probs_idx)):
-                axs[3,1].plot(peak_probs_idx[p]["FCR"], predictions[p][0][peak_probs_idx[p]["FCR"], 4], ls="None", marker="o")
-                
-            for row in axs:
-                for col in row:
-                    col.spines["top"].set_visible(False)
-                    col.spines["right"].set_visible(False)
-                    col.spines["bottom"].set_position("zero")
-                    col.grid(visible=True, which="both", axis="both", alpha=0.2, ls=":")
-            axs[2, 0].set_ylim((-.2, 1.2))
-            axs[2, 1].set_ylim((-.2, 1.2))
-            axs[3, 0].set_ylim((-.2, 1.2))
-            axs[3, 1].set_ylim((-.2, 1.2))
-            axs[3, 1].set_xlim((0, len(data)))
-            plt.show()
+    output_dfs = [df[["file_path", "sub_id", "event_type", "ref", "pred"]] for df in output_dfs]
+    for i, df in enumerate(output_dfs):
+        tmp = df.loc[:, ["ref", "pred"]].min(axis=1)
+        df = pd.concat((df, pd.DataFrame(data=tmp, columns=["tmp"])), axis=1)
+        df = df.sort_values(by=["sub_id", "event_type", "tmp"])
+        output_dfs[i] = df.iloc[:, :-1]
+    
+    for df in output_dfs:
+        num_TPs = len(df[(df["ref"].isna()==False) & (df["pred"].isna()==False)])
+        num_FNs = len(df[(df["ref"].isna()==False) & (df["pred"].isna())])
+        num_FPs = len(df[(df["ref"].isna()) & (df["pred"].isna()==False)])
+        num_pos = num_TPs + num_FNs
+        recall = num_TPs / (num_TPs + num_FNs)
+        precision = num_TPs / (num_TPs + num_FPs)
+        print(f"# pos: {num_pos:d}")
+        print(f"# TPs: {num_TPs}")
+        print(f"# FNs: {num_FNs}")
+        print(f"# FPs: {num_FPs}")
+        print(f"recall: {recall}")
+        print(f"precision: {precision}")
+        print()
     return
 
 if __name__ == "__main__":
