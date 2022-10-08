@@ -1,3 +1,4 @@
+from unittest import result
 import numpy as np
 import os, sys, random
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
@@ -37,6 +38,9 @@ def main(visualize: bool = False):
 
     # Get train, val and test files
     _, _, test_files = split_train_test(DATASET_DIR, test_size=0.2, seed=123)
+    
+    # Get subjects dataframe
+    subjects_df = pd.read_csv(os.path.join(DATASET_DIR, "subjects.tsv"), sep="\t", header=0)
 
     # Get models
     runs_dirs = [d for d in os.listdir(BASE_CHECKPOINT_PATH) if os.path.isdir(os.path.join(BASE_CHECKPOINT_PATH, d))]
@@ -111,10 +115,20 @@ def main(visualize: bool = False):
                 results_df = pd.concat((results_df, events_df), axis=0, ignore_index=True)
             results_df.columns = ["ref", "pred", "event_type"]
             results_df["sub_id"] = [os.path.split(test_file_path)[-1][:8] for _ in range(len(results_df))]
+            results_df["cohort"] = [subjects_df[subjects_df["sub_id"]==os.path.split(test_file_path)[-1][:8]]['cohort'].values[0] for _ in range(len(results_df))]
             results_df["file_path"] = [test_file_path for _ in range(len(results_df))]
+            results_df = results_df[["file_path", "sub_id", "cohort", "event_type", "ref", "pred"]]
             
             # Add to overal output dataframes
             output_dfs[p] = pd.concat((output_dfs[p], results_df), axis=0, ignore_index=True)
+        
+        # Loop over the dataframe
+        for iter, df in enumerate(output_dfs):
+            time_diff = df["pred"] - df["ref"]
+            df["time_diff"] = time_diff
+            
+            # Write to file
+            df.to_csv(f"output_model-{iter+2:02d}.tsv", sep="\t", header=True, index=False)
 
         # Visualize
         visualize = visualize
