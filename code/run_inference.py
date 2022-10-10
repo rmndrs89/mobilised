@@ -1,6 +1,8 @@
+from cgi import test
 from unittest import result
 import numpy as np
 import os, sys, random
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks

@@ -104,11 +104,11 @@ def get_stride_params(labels_idx,
         
         # If both the current and previous event
         # have a valid mapping (i.e., true positive)
-        if (np.isnan(map_labels_preds["ICL"][i])==False) and (np.isnan(map_labels_preds["ICL"][i-1])==False):
+        if (map_labels_preds["ICL"][i] > -1) and (map_labels_preds["ICL"][i-1] > -1):
 
             # Find the final contact in between
             f = np.argwhere((labels_idx["FCL"] > labels_idx["ICL"][i-1]) & (labels_idx["FCL"] < labels_idx["ICL"][i]))[:,0]
-            if (len(f)==1) and (np.isnan(map_labels_preds["FCL"][f[0]])==False):
+            if (len(f)==1) and (map_labels_preds["FCL"][f[0]] > -1):
 
                 # Reference timings
                 stance_time_ref = (labels_idx["FCL"][f[0]] - labels_idx["ICL"][i-1])/SAMPLING_FREQUENCY
@@ -131,11 +131,11 @@ def get_stride_params(labels_idx,
         
         # If both the current and previous event
         # have a valid mapping (i.e., true positive)
-        if (np.isnan(map_labels_preds["ICR"][i])==False) and (np.isnan(map_labels_preds["ICR"][i-1])==False):
+        if (map_labels_preds["ICR"][i] > -1) and (map_labels_preds["ICR"][i-1] > -1):
 
             # Find the final contact in between
             f = np.argwhere((labels_idx["FCR"] > labels_idx["ICR"][i-1]) & (labels_idx["FCR"] < labels_idx["ICR"][i]))[:,0]
-            if (len(f)==1) and (np.isnan(map_labels_preds["FCR"][f[0]])==False):
+            if (len(f)==1) and (map_labels_preds["FCR"][f[0]] > -1):
 
                 # Reference timings
                 stance_time_ref = (labels_idx["FCR"][f[0]] - labels_idx["ICR"][i-1])/SAMPLING_FREQUENCY
@@ -147,7 +147,6 @@ def get_stride_params(labels_idx,
                 swing_time_pred = (preds_idx["ICR"][map_labels_preds["ICR"][i]] - preds_idx["FCR"][map_labels_preds["FCR"][f[0]]])/SAMPLING_FREQUENCY
                 stride_time_pred = (preds_idx["ICR"][map_labels_preds["ICR"][i]] - preds_idx["ICR"][map_labels_preds["ICR"][i-1]])/SAMPLING_FREQUENCY
                 
-                # Add to placeholders
                 # Add to placeholders
                 results_dict["gait_phase"] += ["stance", "swing", "stride"]
                 results_dict["side"] += ["right" for _ in range(3)]
