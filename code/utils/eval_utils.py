@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+from utils.data_utils import SAMPLING_FREQUENCY
 
 def match_events(annotated_idx, preds_idx, tolerance=0, do_print=False):
     """
@@ -88,3 +90,67 @@ def match_events(annotated_idx, preds_idx, tolerance=0, do_print=False):
             ))
         )
     return map_annotations_preds, map_preds_annotations
+
+def get_stride_params(labels_idx, 
+                      preds_idx,
+                      map_labels_preds,
+                      map_preds_labels):
+    
+    # Initialize placeholders to store results
+    results_dict = {"gait_phase": [], "side": [], "ref": [], "pred": []}
+    
+    # Left strides
+    for i in range(1, len(labels_idx["ICL"])):
+        
+        # If both the current and previous event
+        # have a valid mapping (i.e., true positive)
+        if (np.isnan(map_labels_preds["ICL"][i])==False) and (np.isnan(map_labels_preds["ICL"][i-1])==False):
+
+            # Find the final contact in between
+            f = np.argwhere((labels_idx["FCL"] > labels_idx["ICL"][i-1]) & (labels_idx["FCL"] < labels_idx["ICL"][i]))[:,0]
+            if (len(f)==1) and (np.isnan(map_labels_preds["FCL"][f[0]])==False):
+
+                # Reference timings
+                stance_time_ref = (labels_idx["FCL"][f[0]] - labels_idx["ICL"][i-1])/SAMPLING_FREQUENCY
+                swing_time_ref = (labels_idx["ICL"][i] - labels_idx["FCL"][f[0]])/SAMPLING_FREQUENCY
+                stride_time_ref = (labels_idx["ICL"][i] - labels_idx["ICL"][i-1])/SAMPLING_FREQUENCY
+                
+                # Predicted timings
+                stance_time_pred = (preds_idx["FCL"][map_labels_preds["FCL"][f[0]]] - preds_idx["ICL"][map_labels_preds["ICL"][i-1]])/SAMPLING_FREQUENCY
+                swing_time_pred = (preds_idx["ICL"][map_labels_preds["ICL"][i]] - preds_idx["FCL"][map_labels_preds["FCL"][f[0]]])/SAMPLING_FREQUENCY
+                stride_time_pred = (preds_idx["ICL"][map_labels_preds["ICL"][i]] - preds_idx["ICL"][map_labels_preds["ICL"][i-1]])/SAMPLING_FREQUENCY
+                
+                # Add to placeholders
+                results_dict["gait_phase"] += ["stance", "swing", "stride"]
+                results_dict["side"] += ["left" for _ in range(3)]
+                results_dict["ref"] += [stance_time_ref, swing_time_ref, stride_time_ref]
+                results_dict["pred"] += [stance_time_pred, swing_time_pred, stride_time_pred]
+                
+    # Right strides
+    for i in range(1, len(labels_idx["ICR"])):
+        
+        # If both the current and previous event
+        # have a valid mapping (i.e., true positive)
+        if (np.isnan(map_labels_preds["ICR"][i])==False) and (np.isnan(map_labels_preds["ICR"][i-1])==False):
+
+            # Find the final contact in between
+            f = np.argwhere((labels_idx["FCR"] > labels_idx["ICR"][i-1]) & (labels_idx["FCR"] < labels_idx["ICR"][i]))[:,0]
+            if (len(f)==1) and (np.isnan(map_labels_preds["FCR"][f[0]])==False):
+
+                # Reference timings
+                stance_time_ref = (labels_idx["FCR"][f[0]] - labels_idx["ICR"][i-1])/SAMPLING_FREQUENCY
+                swing_time_ref = (labels_idx["ICR"][i] - labels_idx["FCR"][f[0]])/SAMPLING_FREQUENCY
+                stride_time_ref = (labels_idx["ICR"][i] - labels_idx["ICR"][i-1])/SAMPLING_FREQUENCY
+                
+                # Predicted timings
+                stance_time_pred = (preds_idx["FCR"][map_labels_preds["FCR"][f[0]]] - preds_idx["ICR"][map_labels_preds["ICR"][i-1]])/SAMPLING_FREQUENCY
+                swing_time_pred = (preds_idx["ICR"][map_labels_preds["ICR"][i]] - preds_idx["FCR"][map_labels_preds["FCR"][f[0]]])/SAMPLING_FREQUENCY
+                stride_time_pred = (preds_idx["ICR"][map_labels_preds["ICR"][i]] - preds_idx["ICR"][map_labels_preds["ICR"][i-1]])/SAMPLING_FREQUENCY
+                
+                # Add to placeholders
+                # Add to placeholders
+                results_dict["gait_phase"] += ["stance", "swing", "stride"]
+                results_dict["side"] += ["right" for _ in range(3)]
+                results_dict["ref"] += [stance_time_ref, swing_time_ref, stride_time_ref]
+                results_dict["pred"] += [stance_time_pred, swing_time_pred, stride_time_pred]
+    return pd.DataFrame(results_dict)
